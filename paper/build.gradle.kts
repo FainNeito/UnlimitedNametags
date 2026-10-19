@@ -53,10 +53,15 @@ dependencies {
     annotationProcessor(libs.lombok)
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testImplementation("org.mockito:mockito-core:5.23.0")
+    testImplementation(libs.entityLib) {
+        exclude(group = "com.github.retrooper", module = "packetevents-spigot")
+        exclude(group = "com.github.retrooper", module = "packetevents-api")
+    }
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation(libs.paperApi)
-    testRuntimeOnly(libs.packeteventsSpigot)
+    testImplementation(libs.packeteventsSpigot)
 }
 
 tasks.withType<Test>().configureEach {
@@ -132,7 +137,7 @@ tasks.build {
 
 tasks {
     runServer {
-        minecraftVersion("26.2")
+        minecraftVersion("26.3")
 
         downloadPlugins {
             //hangar("PlaceholderAPI", "2.12.2")
@@ -140,10 +145,8 @@ tasks {
             modrinth("multiverse-core", "4.3.14")
             modrinth("essentialsx", "2.22.0")
             modrinth("pworlds", "2.1.0")
-            //url("https://ci.ender.zone/job/EssentialsX/lastSuccessfulBuild/artifact/jars/EssentialsX-2.22.0-dev+112-5baf239.jar")
             github("MiniPlaceholders", "MiniPlaceholders", "3.2.0", "MiniPlaceholders-Paper-3.2.0.jar")
-//            url("https://ci.codemc.io/job/retrooper/job/packetevents/892/artifact/build/libs/packetevents-spigot-2.12.3-SNAPSHOT.jar")
-            modrinth("packetevents", "2.13.0+spigot")
+            modrinth("packetevents", "2.14.0+spigot")
             github("MilkBowl", "Vault", "1.7.3", "Vault.jar")
             github("FeatherMC", "feather-server-api", "v0.0.5", "feather-server-api-0.0.5-bukkit.jar")
             github("LabyMod", "labymod4-server-api", "1.0.6", "labymod-server-api-bukkit-1.0.6.jar")
@@ -175,6 +178,7 @@ tasks {
 }
 
 tasks.processResources {
+    inputs.property("pluginVersion", project.version.toString())
     var compiled = true
     if (rootProject.file("license.txt").exists()) {
         compiled = false
