@@ -30,6 +30,7 @@ import org.alexdev.unlimitednametags.hook.ViaVersionHook;
 import org.alexdev.unlimitednametags.packet.PacketNameTag;
 import org.alexdev.unlimitednametags.packet.PacketNameTags;
 import org.alexdev.unlimitednametags.packet.PaperNametagRow;
+import org.alexdev.unlimitednametags.platform.OwnNametagMovementPolicy;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -480,6 +481,30 @@ public class NameTagManager implements UntNametagManagerPaper {
             return true;
         }
         return s.getVisibility().isAllowPerPlayerShowOwnWhenGlobalDisabled();
+    }
+
+    /** Temporary presentation state, deliberately separate from persisted own-tag preference. */
+    public boolean isOwnNametagSuppressedByMovement(@NotNull Player player) {
+        return plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileSwimmingOrFlying()
+                && (OwnNametagMovementPolicy.isHorizontalPose(player.getPose())
+                    || player.isSwimming() || player.isGliding() || player.isFlying());
+    }
+
+    public void hideOwnNametagForMovement(@NotNull Player player) {
+        for (PaperNametagRow row : getPacketDisplays(player)) {
+            // No blocked flag or preference write: unrelated camera/API blocks must survive recovery.
+            ((PacketNameTag) row).hideFromViewer(player.getUniqueId());
+        }
+    }
+
+    public void reconcileOwnNametagVisibility(@NotNull Player player) {
+        if (!isEffectiveShowOwnNametag(player) || isOwnNametagSuppressedByMovement(player)) {
+            hideOwnNametagForMovement(player);
+            return;
+        }
+        for (PaperNametagRow row : getPacketDisplays(player)) {
+            if (!row.canPlayerSee(player)) row.showToPlayer(player);
+        }
     }
 
     public boolean isHidingOwnNametagFromOthers(@NotNull Player owner) {
@@ -1709,7 +1734,7 @@ public class NameTagManager implements UntNametagManagerPaper {
     }
 
     public void showToOwner(@NotNull Player player) {
-        if (!isEffectiveShowOwnNametag(player)) {
+        if (!isEffectiveShowOwnNametag(player) || isOwnNametagSuppressedByMovement(player)) {
             return;
         }
         for (PaperNametagRow row : getPacketDisplays(player)) {

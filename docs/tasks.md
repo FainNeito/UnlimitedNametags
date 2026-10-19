@@ -1,5 +1,16 @@
 # Nametag rendering and lifecycle tasks
 
+## Own-tag movement follow-up, 2026-10-19
+
+- [x] Spec: fetch current main 7917484 and current PR #101 head e55b183; preserve earlier checkouts and start an isolated worktree from the current reviewed branch containing main. User chose own-tag suppression in all camera views during swimming/prone and flying; no server changes authorized.
+- [x] Prove: 11 new missing-behavior regressions fail on the pre-engine branch. Refine owner spawn assertions to allow the required metadata template; rerun those two tests on unchanged e55b183 and record two failures. No client camera/rendering reproduction is claimed.
+- [x] Engine: owner-only movement guard, immediate transition hide, guarded current-state recovery, direct owner spawn checks, removal of five-tick elytra reveal. Retain saved preference, disabled-preference early return and other viewers.
+- [x] Arch/refine locally: 108 tests pass after refinement; prior canonical clean build and PacketEvents 2.14.0 build pass 107 tests before the final disabled-preference refinement. EARS/whitespace pass. Exact clean-head canonical/compatibility builds and hosted CI/review are delivery gates recorded externally, not claimed by this source commit.
+- [x] Deliver descriptive interactive simulation with clickable private cloud Page; saved/read back and 84 state combinations pass. No UI/browser surface is available; actual rendering/mobile access and in-game acceptance remain unverified, with the limitation stated beside the link and in own-nametag-movement.md.
+- [ ] Player acceptance: first/third person and second viewer; swimming/crawl/prone, elytra, creative flight, fast transitions, preferences, teleport/respawn/reconnect. Test EntityCulling on/off without requiring either setting.
+
+Use the existing external EARS validator; no local SPEAR state helper exists. Production and shared TEST stay untouched. Publication/build/preview evidence will be recorded with the final source head in the external delivery record.
+
 ## CodeFactor review cleanup
 
 - [x] INFRA: incorporate fetched canonical main 7917484 and address the seven current CodeFactor findings on PR #101 without changing runtime behavior. Existing Mockito 5.23.0 constructor-free CALLS_REAL_METHODS fixtures replace the unsupported Unsafe import; split the six compound statement lines. The pose fixture reuses that real-method mock rather than trying to spy an existing mock. This is test/build hygiene, not a newly claimed behavioral red/green cycle. Requirements REQ-001 through REQ-011 remain the regression contract. Canonical wrapper clean build and actual PacketEvents 2.14.0 compatibility each pass 90 tests; external EARS and diff checks pass. Record hosted checks separately. No project-local state tooling exists.

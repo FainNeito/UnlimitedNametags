@@ -25,3 +25,7 @@ Verification and unresolved acceptance are in verification.md. The Gradle wrappe
 - This is mitigation/reconciliation, not a demonstrated root-cause reproduction of either ticket symptom. The inspected local Minecraft 26.3 RemotePlayer does not calculate its own pose; Entity pose metadata drives dimensions. The reported client's exact version and mods remain unknown. Server/client acceptance is separate.
 
 No production configuration, files, console, or process is touched by this follow-up. See ticket-388-acceptance.md for the staging-only configuration and remaining client evidence.
+
+## Own-tag movement guard
+
+Requirements REQ-012 through REQ-014 add temporary owner-only suppression for swimming/crawl/prone, horizontal flight/spin poses and swimming/gliding/flying flags. Preference calculation and persistence stay separate. Entry hides the owner's allocated display; recovery runs on the current owner's scheduler and reads the latest state. Normal platform eligibility and both common direct owner-spawn paths enforce the guard; a non-spawned owner metadata template remains for other viewers and item/block initialization. No forced five-tick reveal, global row removal, pose mutation, permission change or preference write is introduced. The user accepted suppression in all camera views. See own-nametag-movement.md for configuration, simulation and acceptance boundaries.

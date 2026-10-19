@@ -1,5 +1,17 @@
 # Verification evidence
 
+## Own nametag movement guard, 2026-10-19
+
+The new pre-engine suite records 11 failures (two common owner spawn paths and nine Paper movement/policy cases). The initial common assertions were tightened incorrectly around allocation; refinement distinguishes the necessary non-spawned metadata template from a visible spawn. Those two refined tests were independently run against unchanged e55b183 and fail because the old code calls spawn. Earlier compiler/fixture failures are not behavioral proof.
+
+The canonical wrapper clean build and local PacketEvents 2.14.0 substitution build pass 107 tests. A final disabled-preference early-return test/refinement brings the passing test-task suite to 108 (39 common, 69 Paper). Exact clean source head build/compatibility, artifact checksum and hosted checks are recorded in the task's external delivery record after commit. These results are server adapter decisions, not first-person client acceptance.
+
+Coverage includes shared raw owner spawn gates with template retention, all horizontal movement poses and swim/glide/flight flags, normal walking/sneaking/sleeping behavior, config override, saved preference preservation, second-viewer independence, owner scheduler/current-session checks, event-registration cancellation policy, immediate prone entry, and removal of five-tick elytra forced reveal. No permission node/default, rank grant, preference schema or server pose/hitbox is changed. Existing API/javadoc warnings remain visible in build logs.
+
+A current read-only TEST inventory reports packetevents-spigot-2.14.0.jar and UnlimitedNametags-e55b1831-UNMERGED-TEST.jar; inventory alone is not loaded-version or remote-byte proof. Local compatibility uses the existing PacketEvents 2.14.0 JAR. This task performs no TEST/production upload, restart, activation or console commands.
+
+The private cloud preview is saved and read back. Its JavaScript state logic passes 84 combinations. There are no available browser/app surfaces to inspect layout or mobile access; that is explicitly unverified. See own-nametag-movement.md for the canonical HTTPS link and affected-client matrix.
+
 ## CodeFactor cleanup and current upstream
 
 Fetched and incorporated canonical main 791748484fd8e9ce959de16a6553f93da1c37570. The seven published CodeFactor findings were six compound statement lines and one unsupported Unsafe import, all in tests. Split the statements and use the existing Mockito dependency's constructor-free real-method fixtures; the pose fixture now avoids spying that existing mock. No gameplay source changed. Canonical wrapper clean build and separate actual PacketEvents 2.14.0 clean build each pass all 90 tests (zero failures/errors). External EARS and whitespace checks pass. Fresh hosted CI/CodeFactor and client acceptance remain separate gates; no deployment occurred.

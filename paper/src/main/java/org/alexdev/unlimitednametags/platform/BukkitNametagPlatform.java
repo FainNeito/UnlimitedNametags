@@ -149,6 +149,9 @@ public final class BukkitNametagPlatform implements NametagPlatformBridge {
         if (isOwnerViewer && !plugin.getNametagManager().isEffectiveShowOwnNametag(ownerPlayer)) {
             return "own nametag is disabled";
         }
+        if (isOwnerViewer && plugin.getNametagManager().isOwnNametagSuppressedByMovement(ownerPlayer)) {
+            return "own nametag is suppressed during swimming, prone or flight";
+        }
         final var visibility = plugin.getConfigManager().getSettings().getVisibility();
         if (!isOwnerViewer && visibility.getThroughWallMode()
                 == org.alexdev.unlimitednametags.config.Settings.ThroughWallMode.HIDE) {

@@ -43,6 +43,9 @@ class PlayerListenerRecoveryTest {
         TestInstances.set(plugin, "nametagManager", tags);
         TestInstances.set(plugin, "trackerManager", tracker);
         TestInstances.set(plugin, "taskScheduler", scheduler);
+        var config = mock(org.alexdev.unlimitednametags.config.ConfigManager.class);
+        when(config.getSettings()).thenReturn(new org.alexdev.unlimitednametags.config.Settings());
+        TestInstances.set(plugin, "configManager", config);
         TestInstances.set(listener, "plugin", plugin);
         TestInstances.set(listener, "onlinePlayers", online);
         TestInstances.set(listener, "poseRetryRunIds", new ConcurrentHashMap<>());
@@ -62,6 +65,78 @@ class PlayerListenerRecoveryTest {
         var event = new org.bukkit.event.entity.EntityPoseChangeEvent(player, org.bukkit.entity.Pose.STANDING);
         var method = PlayerListener.class.getDeclaredMethod("onPoseChange", org.bukkit.event.entity.EntityPoseChangeEvent.class);
         method.invoke(listener, event);
+    }
+
+    @Test void elytraEntryHidesOwnRowsWithoutFiveTickForcedReveal() {
+        when(tags.isEffectiveShowOwnNametag(player)).thenReturn(true);
+        listener.logicElytra(player);
+        verify(tags).hideOwnNametagForMovement(player);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).runTaskLater(eq(player), task.capture(), eq(1L));
+        verify(scheduler, never()).runTaskLaterAsynchronously(any(Runnable.class), anyLong());
+        task.getValue().run();
+        verify(tags).reconcileOwnNametagVisibility(player);
+    }
+
+    @Test void elytraInputDoesNotScheduleWorkWhenOwnPreferenceIsDisabled() {
+        listener.logicElytra(player);
+        verifyNoInteractions(scheduler);
+        verify(tags, never()).hideOwnNametagForMovement(any());
+    }
+
+    @Test void proneEntryHidesBeforeTheServerPoseHasChanged() {
+        when(player.getPose()).thenReturn(org.bukkit.entity.Pose.STANDING);
+        listener.onPoseChange(new org.bukkit.event.entity.EntityPoseChangeEvent(player, org.bukkit.entity.Pose.SWIMMING));
+        verify(tags).hideOwnNametagForMovement(player);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).runTaskLater(eq(player), task.capture(), eq(1L));
+        online.put(id, mock(Player.class));
+        clearInvocations(tags);
+        task.getValue().run();
+        verifyNoInteractions(tags);
+    }
+
+    @Test void glideExitRestoresFromCurrentStateOnOwnersScheduler() {
+        listener.onOwnTagGlide(new org.bukkit.event.entity.EntityToggleGlideEvent(player, false));
+        verify(tags, never()).hideOwnNametagForMovement(any());
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).runTaskLater(eq(player), task.capture(), eq(1L));
+        task.getValue().run();
+        verify(tags).reconcileOwnNametagVisibility(player);
+    }
+
+    @Test void creativeFlightEntryHidesAndCallbackRejectsDeadOwner() {
+        listener.onOwnTagFlight(new org.bukkit.event.player.PlayerToggleFlightEvent(player, true));
+        verify(tags).hideOwnNametagForMovement(player);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).runTaskLater(eq(player), task.capture(), eq(1L));
+        when(player.isDead()).thenReturn(true);
+        clearInvocations(tags);
+        task.getValue().run();
+        verifyNoInteractions(tags);
+    }
+
+    @Test void swimFlagEntryHidesAndRecoveryRejectsOldSession() {
+        listener.onOwnTagSwim(new org.bukkit.event.entity.EntityToggleSwimEvent(player, true));
+        verify(tags).hideOwnNametagForMovement(player);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).runTaskLater(eq(player), task.capture(), eq(1L));
+        online.put(id, mock(Player.class));
+        clearInvocations(tags);
+        task.getValue().run();
+        verifyNoInteractions(tags);
+    }
+
+    @Test void cancelledMovementEventsAreIgnoredByEventRegistration() throws Exception {
+        for (var handler : java.util.Map.of(
+                "onOwnTagFlight", org.bukkit.event.player.PlayerToggleFlightEvent.class,
+                "onOwnTagGlide", org.bukkit.event.entity.EntityToggleGlideEvent.class,
+                "onOwnTagSwim", org.bukkit.event.entity.EntityToggleSwimEvent.class).entrySet()) {
+            var annotation = PlayerListener.class.getMethod(handler.getKey(), handler.getValue())
+                    .getAnnotation(org.bukkit.event.EventHandler.class);
+            org.junit.jupiter.api.Assertions.assertTrue(annotation.ignoreCancelled());
+            org.junit.jupiter.api.Assertions.assertEquals(org.bukkit.event.EventPriority.MONITOR, annotation.priority());
+        }
     }
 
     @Test void poseRetryUsesOwnersSchedulerAndAuthoritativeNewPose() throws Exception {

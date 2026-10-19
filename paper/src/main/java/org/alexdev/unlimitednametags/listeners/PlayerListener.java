@@ -20,6 +20,9 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityPoseChangeEvent;
+import org.bukkit.event.entity.EntityToggleGlideEvent;
+import org.bukkit.event.entity.EntityToggleSwimEvent;
+import org.alexdev.unlimitednametags.platform.OwnNametagMovementPolicy;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.potion.PotionEffectType;
@@ -416,15 +419,36 @@ public class PlayerListener implements PackSendHandler {
     }
 
     public void logicElytra(Player player) {
-        if (!plugin.getNametagManager().isEffectiveShowOwnNametag(player)) {
-            return;
+        if (!plugin.getNametagManager().isEffectiveShowOwnNametag(player)) return;
+        handleOwnMovementTransition(player, true);
+    }
+
+    private void hideOwnTagOnMovementEntry(@NotNull Player player, boolean entering) {
+        if (entering && plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileSwimmingOrFlying()) {
+            plugin.getNametagManager().hideOwnNametagForMovement(player);
         }
+    }
 
-        plugin.getNametagManager().getPacketDisplays(player).forEach(packetDisplayText -> {
-            packetDisplayText.hideForOwner();
+    private void handleOwnMovementTransition(@NotNull Player player, boolean entering) {
+        hideOwnTagOnMovementEntry(player, entering);
+        plugin.getTaskScheduler().runTaskLater(player, () -> {
+            if (isCurrentVisibleSession(player)) plugin.getNametagManager().reconcileOwnNametagVisibility(player);
+        }, 1L);
+    }
 
-            plugin.getTaskScheduler().runTaskLaterAsynchronously(packetDisplayText::showForOwner, 5);
-        });
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onOwnTagGlide(@NotNull EntityToggleGlideEvent event) {
+        if (event.getEntity() instanceof Player player) handleOwnMovementTransition(player, event.isGliding());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onOwnTagSwim(@NotNull EntityToggleSwimEvent event) {
+        if (event.getEntity() instanceof Player player) handleOwnMovementTransition(player, event.isSwimming());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onOwnTagFlight(@NotNull PlayerToggleFlightEvent event) {
+        handleOwnMovementTransition(event.getPlayer(), event.isFlying());
     }
     
     private void scheduleTeleportSync(@NotNull Player player) {
@@ -481,12 +505,14 @@ public class PlayerListener implements PackSendHandler {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPoseChange(@NotNull EntityPoseChangeEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
+        hideOwnTagOnMovementEntry(player, OwnNametagMovementPolicy.isHorizontalPose(event.getPose()));
         final UUID ownerId = player.getUniqueId();
         final UUID token = UUID.randomUUID();
         poseRetryRunIds.put(ownerId, token);
         plugin.getTaskScheduler().runTaskLater(player, () -> {
-            if (!token.equals(poseRetryRunIds.get(ownerId)) || !isCurrentVisibleSession(player)
-                    || plugin.getNametagManager().getPacketDisplays(player).isEmpty()) return;
+            if (!token.equals(poseRetryRunIds.get(ownerId)) || !isCurrentVisibleSession(player)) return;
+            plugin.getNametagManager().reconcileOwnNametagVisibility(player);
+            if (plugin.getNametagManager().getPacketDisplays(player).isEmpty()) return;
             final String poseName = player.getPose().name();
             final EntityPose pose;
             try {

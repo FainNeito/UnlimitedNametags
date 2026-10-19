@@ -34,4 +34,15 @@ WHEN a visible nametag owner changes pose THE SYSTEM SHALL retry the owner's aut
 ### REQ-011 - Pose integrity
 THE SYSTEM SHALL preserve legitimate swimming, crawling, crouching, sleeping, and flying poses and SHALL NOT change server pose or hitboxes to reconcile a viewer.
 
+### REQ-012 - Own-tag movement suppression
+WHILE an owner is swimming, prone/crawling, gliding, spin-attacking, or flying THE SYSTEM SHALL suppress that owner's nametag rows only for that owner when hideOwnNametagWhileSwimmingOrFlying is enabled.
+
+### REQ-013 - Preference-preserving recovery
+WHEN the owner leaves a suppressed movement state THE SYSTEM SHALL reconcile own-tag visibility from the current online session and saved preferences without changing other viewers, permissions, or persistent preferences.
+
+### REQ-014 - Owner show-path safety
+WHILE movement suppression applies THE SYSTEM SHALL reject owner display spawning through direct spawn, show, refresh, recovery, and delayed elytra paths without a fixed-delay forced reveal.
+
+Vanilla clients do not report first/third-person camera selection. The user chose temporary own-tag suppression in every camera view for these states. The new setting defaults true; disabling it restores previous movement eligibility. Server-observable SWIMMING covers crawling/prone with that pose; client-only pose mods need separate acceptance. Visual previews simulate policy decisions, not Minecraft rendering.
+
 Reproduce teleports, world transfers, tracking-distance removal, vanish/invisibility, quit/rejoin, and repeated transfers with EntityCulling enabled and disabled. Observe the player and every row from a second client. See verification.md for current local evidence and remaining client acceptance; compilation alone does not establish either.

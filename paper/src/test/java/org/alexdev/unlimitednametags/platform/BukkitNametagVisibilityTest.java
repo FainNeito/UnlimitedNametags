@@ -117,6 +117,17 @@ class BukkitNametagVisibilityTest {
         assertEquals("own nametag is disabled", platform.nametagShowBlockReason(ownerId, ownerId, true, false));
         assertNull(reason());
     }
+
+    @Test void ownMovementSuppressionDoesNotHideOwnerFromOtherViewers() throws Exception {
+        when(tags.isEffectiveShowOwnNametag(owner)).thenReturn(true);
+        var method = NameTagManager.class.getMethod("isOwnNametagSuppressedByMovement", Player.class);
+        // Reflection permits this test to execute (and fail) before the new adapter API exists.
+        doReturn(true).when(tags);
+        method.invoke(tags, owner);
+        assertEquals("own nametag is suppressed during swimming, prone or flight",
+                platform.nametagShowBlockReason(ownerId, ownerId, true, false));
+        assertNull(reason());
+    }
     @Test void crossWorldOwnerIsRejectedBeforeDistanceEvaluation() throws Exception {
         mode(Settings.ThroughWallMode.HIDE);
         World other = mock(World.class);

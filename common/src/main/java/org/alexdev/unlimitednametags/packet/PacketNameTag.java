@@ -814,6 +814,11 @@ public abstract class PacketNameTag implements AnimationPoseTarget, NametagPasse
         if (user == null) {
             return;
         }
+        if (!isEligibleToShow(ownerId)) {
+            // Preserve the non-spawned metadata template used by every row type and other viewers.
+            resolveEntity(user);
+            return;
+        }
         final Location location = getOffsetPeLocation();
         if (location == null) {
             return;
@@ -926,6 +931,10 @@ public abstract class PacketNameTag implements AnimationPoseTarget, NametagPasse
         this.visible = true;
         final User user = platform.resolveUser(viewerId);
         if (user == null) {
+            return;
+        }
+        if (viewerId.equals(ownerId) && !isEligibleToShow(viewerId)) {
+            resolveEntity(user);
             return;
         }
 
