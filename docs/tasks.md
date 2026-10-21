@@ -1,5 +1,17 @@
 # Nametag rendering and lifecycle tasks
 
+## Movement-entry flash follow-up, 2026-10-20
+
+- [x] Spec: fetched authoritative FainNeito fork main d62ee79; clean isolated branch. User reports brief entry flash for swimming and flying on TEST as well as production. Production stays read-only.
+- [x] Prove: five transition assertion failures plus two approved early-policy assertion failures on unchanged runtime source. Registry/mock fixture failures are excluded from behavioral proof. No client-frame reproduction is claimed.
+- [x] Engine: bounded session/token-scoped entry suppression, early water/Elytra policy approved by the user, owner-scoped watch and water-entry hook; preserve preferences, other viewers and config escape hatches.
+- [x] Arch/refine locally: 128 tests pass in canonical and actual PacketEvents 2.14.0 builds; EARS and whitespace checks pass. Session/ordering, watch lifecycle, config and preference regressions are included. Exact final commit rebuilds and hosted PR checks are recorded in the external delivery receipt.
+- [x] Descriptive interactive preview saved/read back; 128 policy combinations pass. Rendered mobile layout/device access is unverified. No production upload or activation.
+- [ ] Hosted delivery: reviewable fork PR, exact-head CI/review and TEST client acceptance are distinct gates. Final PR/status evidence is recorded in the external delivery receipt, not inferred from local results.
+- [ ] Client acceptance: repeated swim/glide entry, aborted starts and fast landing, first/third person, second viewer, and EntityCulling on/off. Earlier water/Elytra policy is approved; immediate equip-and-glide/water entry under latency still needs actual client acceptance.
+
+No local SPEAR state helper exists; task/verification records are the state evidence. External EARS validator is available. No Minecraft rendering reproduction is claimed by unit tests.
+
 ## Own-tag movement follow-up, 2026-10-19
 
 - [x] Spec: fetch current main 7917484 and current PR #101 head e55b183; preserve earlier checkouts and start an isolated worktree from the current reviewed branch containing main. User chose own-tag suppression in all camera views during swimming/prone and flying; no server changes authorized.

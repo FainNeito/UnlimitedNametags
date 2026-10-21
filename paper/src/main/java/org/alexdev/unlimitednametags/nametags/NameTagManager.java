@@ -78,6 +78,9 @@ public class NameTagManager implements UntNametagManagerPaper {
     private final Map<UUID, Long> lastDistanceRefreshTicks;
     private final Set<UUID> distanceRefreshCullingBypassed;
     private final Map<UUID, Boolean> shiftSystemBlocked;
+    @Getter(lombok.AccessLevel.NONE)
+    private final Map<UUID, OwnMovementEntry> ownMovementEntries = new ConcurrentHashMap<>();
+    private record OwnMovementEntry(Player session, UUID token) {}
     private final List<MyScheduledTask> tasks;
     private final AtomicLong displayAnimationMonotonicTick = new AtomicLong();
     @Setter
@@ -461,6 +464,7 @@ public class NameTagManager implements UntNametagManagerPaper {
         lastDistanceRefreshTicks.remove(uuid);
         distanceRefreshCullingBypassed.remove(uuid);
         shiftSystemBlocked.remove(uuid);
+        ownMovementEntries.remove(uuid);
     }
 
     @NotNull
@@ -485,9 +489,26 @@ public class NameTagManager implements UntNametagManagerPaper {
 
     /** Temporary presentation state, deliberately separate from persisted own-tag preference. */
     public boolean isOwnNametagSuppressedByMovement(@NotNull Player player) {
-        return plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileSwimmingOrFlying()
-                && (OwnNametagMovementPolicy.isHorizontalPose(player.getPose())
+        final Settings.Visibility visibility = plugin.getConfigManager().getSettings().getVisibility();
+        final OwnMovementEntry entry = ownMovementEntries.get(player.getUniqueId());
+        return visibility.isHideOwnNametagWhileSwimmingOrFlying()
+                && ((entry != null && entry.session() == player)
+                    || (visibility.isHideOwnNametagWhileInWaterOrWearingElytra()
+                        && OwnNametagMovementPolicy.isPreparingForHorizontalMovement(player))
+                    || OwnNametagMovementPolicy.isHorizontalPose(player.getPose())
                     || player.isSwimming() || player.isGliding() || player.isFlying());
+    }
+
+    /** Mark entry before destroying rows, so concurrent refresh cannot respawn them from old pose flags. */
+    public UUID beginOwnNametagMovementEntry(@NotNull Player player) {
+        final UUID token = UUID.randomUUID();
+        ownMovementEntries.put(player.getUniqueId(), new OwnMovementEntry(player, token));
+        return token;
+    }
+
+    /** A superseded input or replaced player session cannot release a newer guard. */
+    public boolean endOwnNametagMovementEntry(@NotNull Player player, @NotNull UUID token) {
+        return ownMovementEntries.remove(player.getUniqueId(), new OwnMovementEntry(player, token));
     }
 
     public void hideOwnNametagForMovement(@NotNull Player player) {

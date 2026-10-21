@@ -8,6 +8,9 @@ import org.alexdev.unlimitednametags.packet.PacketNameTag;
 import org.alexdev.unlimitednametags.packet.PaperNametagRow;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
+import org.bukkit.Material;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +37,7 @@ class OwnNametagMovementTest {
         when(config.getSettings()).thenReturn(settings);
         TestInstances.set(plugin, "configManager", config);
         TestInstances.set(manager, "plugin", plugin);
+        TestInstances.set(manager, "ownMovementEntries", new ConcurrentHashMap<>());
         TestInstances.set(manager, "hideOwnFromSelf", hiddenPreferences);
         var rows = new ConcurrentHashMap<UUID, CopyOnWriteArrayList<PacketNameTag>>();
         rows.put(ownerId, new CopyOnWriteArrayList<>(List.of(packet)));
@@ -66,6 +70,49 @@ class OwnNametagMovementTest {
         when(owner.isSwimming()).thenReturn(false);
         when(owner.isGliding()).thenReturn(true);
         assertTrue(suppressed());
+    }
+
+    @Test void waterContactSuppressesBeforeSwimmingStarts() throws Exception {
+        when(owner.isInWater()).thenReturn(true);
+        assertTrue(suppressed());
+        reconcile();
+        verify(row, never()).showToPlayer(any());
+        when(owner.isInWater()).thenReturn(false);
+        reconcile();
+        verify(row).showToPlayer(owner);
+        assertTrue(hiddenPreferences.isEmpty());
+    }
+
+    @Test void wornElytraSuppressesWhileStandingAndRemovalRestores() throws Exception {
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(owner.getInventory()).thenReturn(inventory);
+        ItemStack elytra = mock(ItemStack.class);
+        when(elytra.getType()).thenReturn(Material.ELYTRA);
+        when(inventory.getChestplate()).thenReturn(elytra);
+        assertTrue(suppressed());
+        reconcile();
+        verify(row, never()).showToPlayer(any());
+        when(inventory.getChestplate()).thenReturn(null);
+        reconcile();
+        verify(row).showToPlayer(owner);
+        assertTrue(hiddenPreferences.isEmpty());
+    }
+
+    @Test void earlyHidingCanBeDisabledWithoutDisablingActualMovementHiding() throws Exception {
+        TestInstances.set(settings.getVisibility(), "hideOwnNametagWhileInWaterOrWearingElytra", false);
+        when(owner.isInWater()).thenReturn(true);
+        assertFalse(suppressed());
+        when(owner.isSwimming()).thenReturn(true);
+        assertTrue(suppressed());
+    }
+
+    @Test void chestArmourDoesNotTriggerElytraHiding() throws Exception {
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(owner.getInventory()).thenReturn(inventory);
+        ItemStack armour = mock(ItemStack.class);
+        when(armour.getType()).thenReturn(Material.DIAMOND_CHESTPLATE);
+        when(inventory.getChestplate()).thenReturn(armour);
+        assertFalse(suppressed());
     }
 
     @Test void walkingSneakingAndSleepingKeepExistingPreference() throws Exception {

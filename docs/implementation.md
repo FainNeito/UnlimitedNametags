@@ -1,5 +1,17 @@
 # Nametag lifecycle and rendering design
 
+## Entry flash follow-up, 2026-10-20
+
+The user reports a brief own-tag flash when entering swimming and flying poses on both TEST and production. Server-side eligibility previously depended solely on already-updated pose/flags, despite entry events being able to precede those updates. Seven new behavior assertions fail on unchanged d62ee79: five transition ordering cases and two earlier-hiding cases. This proves a server eligibility gap and missing approved policy, not the causal ordering of the recorded client frame.
+
+Entry now marks a session/token guard before destroying owner rows. All owner show paths share the existing movement eligibility gate, so a refresh during pre-update flags cannot restore them. A five-owner-tick callback removes only its own token, then rechecks session, current pose/flags and normal visibility. Failed starts recover without a permanent block; superseded callbacks cannot release newer entries. Pose, swim, glide, creative-flight and Elytra input use the same latch. Client entity-action IDs must match the sender, and cancelled packets are ignored.
+
+The user approved earlier hiding while in water or wearing Elytra. The new default-true visibility.hideOwnNametagWhileInWaterOrWearingElytra option extends the existing movement master switch. The owner eligibility adapter applies this policy to every spawn path. A one-tick entity-scheduled watch hides visible owner rows after water/equipment changes and reconciles on exit; it does not repeatedly destroy already-hidden rows. Watches start for existing players and joins, cancel on replacement/quit/close, and reject replaced/invisible/dead/spectator sessions. An accepted move into a WATER block also marks the entry before isInWater updates; waterlogged contacts use the authoritative water flag/watch.
+
+Only the owner's copy is suppressed. No pose, hitbox, permissions, preferences or other-viewer row state changes. No persistence migration is needed. Local wrapper builds use the declared Paper 26.2/Java 25 toolchain and separately verify the installed PacketEvents 2.14.0 API. There is no network submodule pin for this standalone plugin. Production and shared TEST remain unchanged in this implementation task.
+
+The policy removes the need to wait for horizontal pose when water/equipment is already known. Client prediction before the first water/equipment update still cannot be retroactively undone by a server plugin; acceptance must include immediate equip-and-glide and sprinting directly into water under realistic latency. No guarantee across arbitrary client mods or network conditions is inferred from unit tests.
+
 ## Spec and prove
 
 Requirements are in requirements.md. Reports establish stale rows at an old player location, inconsistent OBSCURED rendering, and failure to recover after invisibility/spectator transitions. Screenshots and reported relog recovery establish symptoms, not a complete causal packet trace. The baseline already has viewer cleanup/session regression tests; they are existing evidence, not historical red/green evidence for this work.

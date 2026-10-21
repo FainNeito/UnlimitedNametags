@@ -1,5 +1,13 @@
 # Verification evidence
 
+## Entry flash follow-up, 2026-10-20
+
+On unchanged fork main d62ee79, the new real-manager/listener transition suite has five assertion failures out of eight tests. After adding the two approved early-policy assertions, the combined suites have seven assertion failures out of eighteen tests. The first exploratory run also encountered missing PotionEffectType registry initialization; that fixture error was corrected and is not counted as behavioral proof. The isolated red logs are retained externally in operations/unlimitednametags-report-20261020.
+
+Refinement covers entry-before-flags, one-tick premature recovery, bounded failed-start recovery, overlapping transitions, stale sessions, current swimming flags, preference/config preservation, water move pre-flags, owner-scoped watch hide/recovery/cancellation, Elytra versus chest armour, early-policy escape hatch, and sender entity-ID validation. An initial full build found a mocked World.getBlockAt(Location) fixture mismatch; correcting the stub produced a passing full build. Exact final head canonical clean build and installed PacketEvents compatibility results are recorded in the delivery receipt after committing; do not infer them from an earlier source head.
+
+The interactive preview's pure policy function passes 128 state combinations. It is schematic, not a Minecraft rendering proof. Source and embed readback verify saved content, not rendered mobile layout/device access. Remaining real-client acceptance includes all cases in own-nametag-movement.md. No shared TEST/production upload, activation or restart is performed here.
+
 ## Own nametag movement guard, 2026-10-19
 
 The new pre-engine suite records 11 failures (two common owner spawn paths and nine Paper movement/policy cases). The initial common assertions were tightened incorrectly around allocation; refinement distinguishes the necessary non-spawned metadata template from a visible spawn. Those two refined tests were independently run against unchanged e55b183 and fail because the old code calls spawn. Earlier compiler/fixture failures are not behavioral proof.

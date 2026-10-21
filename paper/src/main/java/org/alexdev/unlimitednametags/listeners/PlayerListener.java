@@ -12,6 +12,7 @@ import org.alexdev.unlimitednametags.hook.PackSendHandler;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -30,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PlayerListener implements PackSendHandler {
 
@@ -47,6 +49,8 @@ public class PlayerListener implements PackSendHandler {
     private final Map<UUID, MyScheduledTask> respawnShowTasks;
     private final Map<UUID, Location> playerWorlds;
     private final Map<UUID, UUID> poseRetryRunIds = Maps.newConcurrentMap();
+    private final Map<UUID, MyScheduledTask> ownMovementWatchTasks = Maps.newConcurrentMap();
+    private static final long OWN_MOVEMENT_SETTLE_TICKS = 5L;
     private static final long[] TELEPORT_SYNC_DELAYS = {5L, 20L, 60L, 100L};
 
     public PlayerListener(UnlimitedNameTags plugin) {
@@ -69,6 +73,7 @@ public class PlayerListener implements PackSendHandler {
         Bukkit.getOnlinePlayers().forEach(player -> {
             playerEntityId.put(player.getEntityId(), player.getUniqueId());
             onlinePlayers.put(player.getUniqueId(), player);
+            startOwnMovementWatch(player);
         });
     }
 
@@ -175,6 +180,7 @@ public class PlayerListener implements PackSendHandler {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(@NotNull PlayerJoinEvent event) {
         onlinePlayers.put(event.getPlayer().getUniqueId(), event.getPlayer());
+        startOwnMovementWatch(event.getPlayer());
         playerNameId.put(event.getPlayer().getName(), event.getPlayer().getUniqueId());
         plugin.getTaskScheduler().runTaskLaterAsynchronously(() -> {
             if (event.getPlayer().isOnline()) {
@@ -203,6 +209,7 @@ public class PlayerListener implements PackSendHandler {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onQuit(@NotNull PlayerQuitEvent event) {
+        cancelOwnMovementWatch(event.getPlayer().getUniqueId());
         poseRetryRunIds.remove(event.getPlayer().getUniqueId());
         plugin.getPacketEventsListener().removePlayerData(event.getPlayer());
         playerNameId.remove(event.getPlayer().getName());
@@ -424,8 +431,49 @@ public class PlayerListener implements PackSendHandler {
     }
 
     private void hideOwnTagOnMovementEntry(@NotNull Player player, boolean entering) {
-        if (entering && plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileSwimmingOrFlying()) {
+        if (entering && onlinePlayers.get(player.getUniqueId()) == player
+                && plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileSwimmingOrFlying()) {
+            final UUID token = plugin.getNametagManager().beginOwnNametagMovementEntry(player);
             plugin.getNametagManager().hideOwnNametagForMovement(player);
+            plugin.getTaskScheduler().runTaskLater(player, () -> {
+                if (plugin.getNametagManager().endOwnNametagMovementEntry(player, token)
+                        && isCurrentVisibleSession(player)) {
+                    plugin.getNametagManager().reconcileOwnNametagVisibility(player);
+                }
+            }, OWN_MOVEMENT_SETTLE_TICKS);
+        }
+    }
+
+    /** One owner-scoped watch catches equipment/water changes without waiting for the next text refresh. */
+    void startOwnMovementWatch(@NotNull Player player) {
+        final UUID id = player.getUniqueId();
+        cancelOwnMovementWatch(id);
+        final AtomicBoolean previouslySuppressed = new AtomicBoolean();
+        final MyScheduledTask task = plugin.getTaskScheduler().runTaskTimer(player, () -> {
+            if (!isCurrentVisibleSession(player)) {
+                return;
+            }
+            final var manager = plugin.getNametagManager();
+            final boolean suppressed = manager.isOwnNametagSuppressedByMovement(player);
+            if (suppressed) {
+                // Destroy only displayed rows. Repeated ticks must not send repeated destroy packets.
+                manager.getPacketDisplays(player).stream().filter(row -> row.canPlayerSee(player))
+                        .forEach(row -> ((org.alexdev.unlimitednametags.packet.PacketNameTag) row)
+                                .hideFromViewer(id));
+            } else if (previouslySuppressed.get()) {
+                manager.reconcileOwnNametagVisibility(player);
+            }
+            previouslySuppressed.set(suppressed);
+        }, 1L, 1L);
+        if (task != null) {
+            ownMovementWatchTasks.put(id, task);
+        }
+    }
+
+    private void cancelOwnMovementWatch(UUID id) {
+        final MyScheduledTask task = ownMovementWatchTasks.remove(id);
+        if (task != null) {
+            task.cancel();
         }
     }
 
@@ -449,6 +497,23 @@ public class PlayerListener implements PackSendHandler {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onOwnTagFlight(@NotNull PlayerToggleFlightEvent event) {
         handleOwnMovementTransition(event.getPlayer(), event.isFlying());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onOwnTagWaterEntry(@NotNull PlayerMoveEvent event) {
+        if (!plugin.getConfigManager().getSettings().getVisibility().isHideOwnNametagWhileInWaterOrWearingElytra()) {
+            return;
+        }
+        final Location from = event.getFrom();
+        final Location to = event.getTo();
+        if (to == null || (from.getWorld() == to.getWorld() && from.getBlockX() == to.getBlockX()
+                && from.getBlockY() == to.getBlockY() && from.getBlockZ() == to.getBlockZ())) {
+            return;
+        }
+        if (to.getBlock().getType() == Material.WATER && from.getBlock().getType() != Material.WATER) {
+            // The move event can precede isInWater/isSwimming becoming authoritative.
+            hideOwnTagOnMovementEntry(event.getPlayer(), true);
+        }
     }
     
     private void scheduleTeleportSync(@NotNull Player player) {
@@ -540,6 +605,8 @@ public class PlayerListener implements PackSendHandler {
     }
 
     public void close() {
+        ownMovementWatchTasks.values().forEach(MyScheduledTask::cancel);
+        ownMovementWatchTasks.clear();
         poseRetryRunIds.clear();
         diedPlayers.clear();
         playerEntityId.clear();

@@ -45,4 +45,17 @@ WHILE movement suppression applies THE SYSTEM SHALL reject owner display spawnin
 
 Vanilla clients do not report first/third-person camera selection. The user chose temporary own-tag suppression in every camera view for these states. The new setting defaults true; disabling it restores previous movement eligibility. Server-observable SWIMMING covers crawling/prone with that pose; client-only pose mods need separate acceptance. Visual previews simulate policy decisions, not Minecraft rendering.
 
+### REQ-015 - Movement entry ordering
+WHEN a current owner's swimming, horizontal pose, glide, flight, or Elytra input transition starts THE SYSTEM SHALL retain temporary owner-only suppression across refresh and recovery until the entry settling window completes, even before server pose flags update.
+
+### REQ-016 - Bounded transition recovery
+WHEN an entry settling callback completes THE SYSTEM SHALL release only its matching owner-session transition and reconcile current movement, visibility and saved preferences, including failed or aborted starts.
+
+The settling window is five owner-scheduler ticks. It prevents premature server-side respawn; it cannot retroactively hide a client-predicted frame before the server receives input. The user approved earlier suppression while in water or wearing Elytra on 2026-10-20.
+
+### REQ-017 - Anticipate horizontal movement
+WHERE hideOwnNametagWhileInWaterOrWearingElytra is enabled WHILE movement hiding is enabled and an owner is in water or wearing an Elytra THE SYSTEM SHALL suppress only that owner's own rows before swimming or gliding starts and reconcile visibility when those conditions end.
+
+Earlier suppression defaults enabled. It covers equipped Elytra even on land and water contact before swimming. It applies in all cameras, preserves other viewers and preferences, and does not require a client mod. Actual client transition acceptance remains required, especially simultaneous equipment/water entry and pose prediction under latency.
+
 Reproduce teleports, world transfers, tracking-distance removal, vanish/invisibility, quit/rejoin, and repeated transfers with EntityCulling enabled and disabled. Observe the player and every row from a second client. See verification.md for current local evidence and remaining client acceptance; compilation alone does not establish either.
