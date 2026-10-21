@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Own nametag entry policy</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;color:light-dark(#20252b,#e7edf4);background:light-dark(#fafafa,#171a20)}
+body{margin:0;padding:18px;max-width:680px}*{box-sizing:border-box}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+label{display:block}select{width:100%;min-height:44px;font:inherit;margin-top:5px}input{width:20px;height:20px;vertical-align:middle;margin-right:8px}
+.check{display:flex;align-items:center;min-height:44px;gap:5px}.check input{flex-shrink:0}
+.scene{position:relative;min-height:245px;display:grid;place-items:center;background:#3b4549;color:#f8f5e9;overflow:hidden}
+.ground{position:absolute;inset:68% 0 0;background:#53664d}.avatar{position:relative;width:36px;height:80px;background:#477b95;z-index:1;transform-origin:50% 80%;margin-top:45px}
+.avatar:before{content:"";position:absolute;left:3px;top:-27px;width:30px;height:27px;background:#ba9370}.avatar.horizontal{transform:rotate(80deg)}
+.tag{position:absolute;top:40px;left:0;right:0;text-align:center;font-family:monospace;font-size:18px;text-shadow:2px 2px #16191b;z-index:2}.rank{color:#ffdc65}
+.caption{position:absolute;bottom:10px;left:12px;right:12px;font-size:14px;text-align:center;z-index:2}
+output{display:block;margin-top:12px;font-weight:600}button{min-height:44px;font:inherit;padding:8px 12px;margin-top:14px}
+@media(max-width:420px){.controls{grid-template-columns:1fr}.tag{font-size:16px}}
+</style></head><body>
+<div class="controls">
+<label>Movement stage<select id="stage"><option value="dry">Standing on dry ground</option><option value="water">In water, not swimming yet</option><option value="swim">Swimming</option><option value="elytra">Wearing Elytra on land</option><option value="glide">Gliding</option><option value="flight">Creative flight</option><option value="prone">Crawling or prone</option><option value="entry">Entry pending, server still standing</option></select></label>
+<label>Observer<select id="observer"><option value="self">Your own camera</option><option value="other">Another player</option></select></label>
+<label class="check"><input id="preference" type="checkbox" checked>Saved own tag preference on</label>
+<label class="check"><input id="early" type="checkbox" checked>Hide early in water or Elytra</label>
+<label class="check"><input id="guard" type="checkbox" checked>Movement hiding on</label>
+</div>
+<div class="scene" role="img" aria-label="Schematic player and nametag visibility">
+ <div class="ground"></div><div class="avatar" id="avatar"></div>
+ <div class="tag" id="tag"><span class="rank">[Member]</span> Memenative<br>Selected tag</div>
+ <div class="caption" id="caption"></div>
+</div>
+<output id="result" aria-live="polite"></output>
+<button id="settle" type="button" hidden>Finish aborted entry after five server ticks</button>
+<script>
+function entryVisibility(s){
+ const active=['swim','glide','flight','prone'].includes(s.stage);
+ const early=s.early&&['water','swim','elytra','glide'].includes(s.stage);
+ const suppressed=s.guard&&(active||early||s.stage==='entry');
+ return s.observer==='other'||(s.preference&&!suppressed);
+}
+const ids=['stage','observer','preference','early','guard'];
+const controls=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));
+function render(){
+ const s={stage:controls.stage.value,observer:controls.observer.value,preference:controls.preference.checked,early:controls.early.checked,guard:controls.guard.checked};
+ const visible=entryVisibility(s);
+ document.getElementById('tag').hidden=!visible;
+ document.getElementById('avatar').classList.toggle('horizontal',['swim','glide','prone'].includes(s.stage));
+ document.getElementById('caption').textContent=controls.stage.selectedOptions[0].textContent;
+ document.getElementById('result').textContent=s.observer==='other'?'Other viewer: name and tag remain visible':visible?'Your name and tag are visible':'Your name and tag are hidden';
+ document.getElementById('settle').hidden=s.stage!=='entry';
+}
+ids.forEach(id=>controls[id].addEventListener('change',render));
+document.getElementById('settle').addEventListener('click',()=>{controls.stage.value='dry';render()});
+render();
+</script></body></html>

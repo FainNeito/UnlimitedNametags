@@ -96,6 +96,9 @@ public class PacketEventsListener extends PacketListenerAbstract {
 
     @Override
     public void onPacketReceive(@NotNull PacketReceiveEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
         if (event.getPacketType() == PacketType.Play.Client.ENTITY_ACTION) {
             handleUseEntity(event);
         } else if (event.getPacketType() == PacketType.Play.Client.PLAYER_INPUT) {
@@ -104,11 +107,15 @@ public class PacketEventsListener extends PacketListenerAbstract {
     }
 
     private void handleUseEntity(PacketReceiveEvent event) {
-        if (!(event.getPlayer() instanceof Player)) {
+        if (!(event.getPlayer() instanceof Player sender)) {
             return;
         }
 
         final WrapperPlayClientEntityAction packet = new WrapperPlayClientEntityAction(event);
+        // Input may only suppress/update the sending player, never an arbitrary client-supplied entity ID.
+        if (packet.getEntityId() != sender.getEntityId()) {
+            return;
+        }
         final Optional<? extends Player> player = plugin.getPlayerListener().getPlayerFromEntityId(packet.getEntityId());
         if (player.isEmpty()) {
             return;

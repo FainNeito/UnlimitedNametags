@@ -25,6 +25,14 @@ Merge this setting into the existing visibility section if an explicit override 
 
 ## Implementation and integration
 
+### Entry flash follow-up
+
+The user approved hiding your own name and tag earlier, while in water or wearing Elytra, including standing on land with Elytra. This prevents waiting for swimming/gliding pose when those conditions are already known. visibility.hideOwnNametagWhileInWaterOrWearingElytra defaults true and requires the existing hideOwnNametagWhileSwimmingOrFlying master switch. Disable the new option to retain movement-only hiding. Neither option changes stored own-tag preferences or other players' normal view.
+
+A bounded five-owner-tick transition guard blocks refresh/show/recovery before pose flags update. It expires through current-state/session eligibility, so failed starts recover and active movement stays hidden. A one-tick owner watch observes water/equipment changes and restores eligible rows after exit/removal; a water-block entry event hides before server water flags update. These are server scheduling intervals, not promised client frame latency. Cancellation, session replacement, normal visibility gates, and current preferences remain effective.
+
+[Own Nametag Entry Preview](https://chatgpt.com/space/page_26d254c534948191907ae37eb838637a) shows the revised policy, observer views, saved preference, early hiding and an aborted transition. It is a schematic simulation; in-game rendering and mobile layout/device access remain unverified. Its pure policy function passes 128 state combinations.
+
 The Paper adapter translates Bukkit pose/flags into the owner-only decision. NameTagManager keeps temporary suppression separate from isEffectiveShowOwnNametag, which remains the preference/global-policy calculation. Glide, swim and flight handlers run at MONITOR with ignoreCancelled; pose events also handle crawl/prone. Recovery uses the owner's scheduler and session identity. The old elytra packet hook retains its disabled-preference early return.
 
 The common direct owner spawn paths honor eligibility, but still allocate a non-spawned metadata template. This is necessary for other viewers' text, item and block display initialization. Temporary hiding retains that template and does not globally remove rows. Recovery uses the normal row API without clearing unrelated blocked flags.

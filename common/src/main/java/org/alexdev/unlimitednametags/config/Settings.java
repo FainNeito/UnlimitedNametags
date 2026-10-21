@@ -198,6 +198,13 @@ public class Settings {
         })
         private boolean hideOwnNametagWhileSwimmingOrFlying = true;
 
+        @Comment({
+                "Hide your own rows early while in water or wearing Elytra, before client-predicted swim/glide entry.",
+                "Requires hideOwnNametagWhileSwimmingOrFlying. Applies in every camera view, including on land with Elytra.",
+                "Does not change saved preferences or other players' view of you."
+        })
+        private boolean hideOwnNametagWhileInWaterOrWearingElytra = true;
+
         @Setter
         @Comment("When showCurrentNameTag is false, players may still enable seeing their own nametag via /unt preferences if they have permission.")
         private boolean allowPerPlayerShowOwnWhenGlobalDisabled = false;
