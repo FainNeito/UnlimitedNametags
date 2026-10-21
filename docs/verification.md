@@ -8,6 +8,8 @@ Refinement covers entry-before-flags, one-tick premature recovery, bounded faile
 
 The interactive preview's pure policy function passes 128 state combinations. It is schematic, not a Minecraft rendering proof. Source and embed readback verify saved content, not rendered mobile layout/device access. Remaining real-client acceptance includes all cases in own-nametag-movement.md. No shared TEST/production upload, activation or restart is performed here.
 
+Manual review identified that an entity-scheduled watch for an already-online player can run during plugin enable before NameTagManager is assigned. A focused new regression fails with NullPointerException before the null-manager guard. The watch now waits without changing its previous-state snapshot and reconciles normally once initialization finishes. This adds one case to the final suite; its exact-head results are recorded externally.
+
 ## Own nametag movement guard, 2026-10-19
 
 The new pre-engine suite records 11 failures (two common owner spawn paths and nine Paper movement/policy cases). The initial common assertions were tightened incorrectly around allocation; refinement distinguishes the necessary non-spawned metadata template from a visible spawn. Those two refined tests were independently run against unchanged e55b183 and fail because the old code calls spawn. Earlier compiler/fixture failures are not behavioral proof.

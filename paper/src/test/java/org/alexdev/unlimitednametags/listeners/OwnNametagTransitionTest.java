@@ -229,6 +229,17 @@ class OwnNametagTransitionTest {
         verify(task).cancel();
     }
 
+    @Test void watchWaitsForManagerDuringEnable() throws Exception {
+        Runnable watch = startWatch();
+        TestInstances.set(listener.getPlugin(), "nametagManager", null);
+        assertDoesNotThrow(watch::run);
+        TestInstances.set(listener.getPlugin(), "nametagManager", tags);
+        when(owner.isInWater()).thenReturn(true);
+        when(row.canPlayerSee(owner)).thenReturn(true);
+        watch.run();
+        verify(packet).hideFromViewer(id);
+    }
+
     @Test void previousSessionEntryCannotBlockOrReleaseNewSessionsEntry() {
         UUID first = tags.beginOwnNametagMovementEntry(owner);
         Player replacement = mock(Player.class);

@@ -454,6 +454,10 @@ public class PlayerListener implements PackSendHandler {
                 return;
             }
             final var manager = plugin.getNametagManager();
+            // Entity schedulers may run while onEnable is still constructing the remaining managers.
+            if (manager == null) {
+                return;
+            }
             final boolean suppressed = manager.isOwnNametagSuppressedByMovement(player);
             if (suppressed) {
                 // Destroy only displayed rows. Repeated ticks must not send repeated destroy packets.
