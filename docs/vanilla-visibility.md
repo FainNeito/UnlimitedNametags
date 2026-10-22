@@ -26,7 +26,7 @@ This is distance/sneaking parity, not F1 parity or a replacement rendering archi
 
 ## Adoption and rollback
 
-Reconciliation restores only viewer/row pairs previously suppressed by this policy. It does not retry cancelled show events every tick or reveal arbitrary manually hidden rows. Suppression state is cleared on reload, viewer removal and row retirement. This is transient state, not saved player data.
+Reconciliation restores only viewer/row pairs previously suppressed by this policy. It does not retry cancelled show events every tick or reveal arbitrary manually hidden rows. Reloading while VANILLA remains selected retains this transient state so hidden rows can recover normally. Switching to another mode restores only these pairs through normal show eligibility on the viewer scheduler, with current row/session/mode checks, then clears the transient state. Viewer removal and row retirement also clear their suppression entries. No player data is saved.
 
 After review, build and isolated TEST acceptance, select `visibility.throughWallMode: VANILLA` and keep `behavior.viewDistance: 160`. VANILLA ignores the configured through-wall maxDistance and uses 64. Existing wall opacity and sneak opacity remain in use. Both own-tag switches remain false on production. No production configuration/JAR/reload/restart is part of this source change. Roll back by restoring the previous mode; no player data migration is needed.
 

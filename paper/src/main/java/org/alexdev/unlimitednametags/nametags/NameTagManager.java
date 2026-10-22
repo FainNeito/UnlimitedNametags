@@ -138,7 +138,7 @@ public class NameTagManager implements UntNametagManagerPaper {
     private void startTask() {
         tasks.forEach(MyScheduledTask::cancel);
         tasks.clear();
-        vanillaSuppressedViewers.clear();
+        releaseVanillaSuppressionIfDisabled();
 
         final MyScheduledTask displayAnimations = plugin.getTaskScheduler().runTaskTimerAsynchronously(
                 () -> {
@@ -375,6 +375,28 @@ public class NameTagManager implements UntNametagManagerPaper {
                 && VanillaNametagVisibility.isWithinRange(
                         owner.getLocation().distanceSquared(viewer.getLocation()), sneaking)
                 && (!sneaking || viewer.hasLineOfSight(owner));
+    }
+
+    private void releaseVanillaSuppressionIfDisabled() {
+        if (plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                == Settings.ThroughWallMode.VANILLA) return;
+        vanillaSuppressedViewers.forEach((rowId, viewers) -> {
+            final PacketNameTag tag = entityIdToDisplay.get(rowId);
+            if (tag == null) return;
+            for (UUID viewerId : Set.copyOf(viewers)) {
+                final Player viewer = plugin.getPlayerListener().getPlayer(viewerId);
+                if (viewer == null) continue;
+                plugin.getTaskScheduler().runTask(viewer, () -> {
+                    if (viewer.isOnline() && plugin.getPlayerListener().getPlayer(viewerId) == viewer
+                            && entityIdToDisplay.get(rowId) == tag && !tag.isRemoved()
+                            && plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                                != Settings.ThroughWallMode.VANILLA) {
+                        paperRow(tag).showToPlayer(viewer);
+                    }
+                });
+            }
+        });
+        vanillaSuppressedViewers.clear();
     }
 
     private void reconcileVanillaVisibility() {
