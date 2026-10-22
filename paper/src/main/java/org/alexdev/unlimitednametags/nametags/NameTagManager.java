@@ -22,6 +22,7 @@ import org.alexdev.unlimitednametags.config.DistanceRefreshCulling;
 import org.alexdev.unlimitednametags.config.GlowOverride;
 import org.alexdev.unlimitednametags.config.NametagDisplayType;
 import org.alexdev.unlimitednametags.config.Settings;
+import org.alexdev.unlimitednametags.config.VanillaNametagVisibility;
 import org.alexdev.unlimitednametags.data.NametagPlayerGlowStorage;
 import org.alexdev.unlimitednametags.data.NametagPlayerOverrideStorage;
 import org.alexdev.unlimitednametags.data.NametagPlayerPreferences;
@@ -223,7 +224,12 @@ public class NameTagManager implements UntNametagManagerPaper {
         }
 
         final Settings.Visibility visibility = plugin.getConfigManager().getSettings().getVisibility();
+        if (visibility.getThroughWallMode() == Settings.ThroughWallMode.VANILLA) {
+            tasks.add(plugin.getTaskScheduler().runTaskTimerAsynchronously(
+                    this::reconcileVanillaVisibility, 1, 1));
+        }
         if (visibility.getThroughWallMode() == Settings.ThroughWallMode.OBSCURED || visibility.getThroughWallMode() == Settings.ThroughWallMode.HIDE
+                || visibility.getThroughWallMode() == Settings.ThroughWallMode.VANILLA
                 || visibility.isPreferNormalTextWithLineOfSight()) {
             final int obscuredInterval = Math.max(1, visibility.getThroughWallSettings().getCheckInterval());
             final MyScheduledTask obscured = plugin.getTaskScheduler().runTaskTimerAsynchronously(
@@ -299,10 +305,11 @@ public class NameTagManager implements UntNametagManagerPaper {
             }
             return;
         }
-        final double maxDistance = s.getVisibility().getThroughWallSettings().getMaxDistance();
+        final double maxDistance = mode == Settings.ThroughWallMode.VANILLA
+                ? VanillaNametagVisibility.NORMAL_RANGE : s.getVisibility().getThroughWallSettings().getMaxDistance();
         final double maxSq = maxDistance * maxDistance;
 
-        if (mode == Settings.ThroughWallMode.OBSCURED) {
+        if (mode == Settings.ThroughWallMode.OBSCURED || mode == Settings.ThroughWallMode.VANILLA) {
             final byte sneakB = clampMcTextOpacity(s.getVisibility().getSneakOpacity());
             final byte obscB = clampMcTextOpacity(s.getVisibility().getThroughWallSettings().getOpacity());
             for (final CopyOnWriteArrayList<PacketNameTag> tags : nameTags.values()) {
@@ -315,7 +322,8 @@ public class NameTagManager implements UntNametagManagerPaper {
                         continue;
                     }
                     final boolean shiftBlocked = shiftSystemBlocked.getOrDefault(owner.getUniqueId(), false);
-                    final boolean sneakEff = tag.isSneaking() && !shiftBlocked;
+                    final boolean sneakEff = mode == Settings.ThroughWallMode.VANILLA
+                            ? owner.isSneaking() : tag.isSneaking() && !shiftBlocked;
                     tag.applyObscuredLineOfSightPresentation(true, sneakB, obscB, maxSq, sneakEff);
                 }
             }
@@ -351,6 +359,53 @@ public class NameTagManager implements UntNametagManagerPaper {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /** Shared by initial spawning and movement reconciliation; own-tag policy stays separate. */
+    public boolean isWithinVanillaVisibility(@NotNull Player owner, @NotNull Player viewer, boolean sneaking) {
+        if (plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                != Settings.ThroughWallMode.VANILLA || owner.getUniqueId().equals(viewer.getUniqueId())) {
+            return true;
+        }
+        return owner.getWorld() == viewer.getWorld()
+                && VanillaNametagVisibility.isWithinRange(
+                        owner.getLocation().distanceSquared(viewer.getLocation()), sneaking)
+                && (!sneaking || viewer.hasLineOfSight(owner));
+    }
+
+    private void reconcileVanillaVisibility() {
+        for (UUID ownerId : nameTags.keySet()) {
+            final Player owner = plugin.getPlayerListener().getPlayer(ownerId);
+            if (owner == null) continue;
+            for (Player viewer : plugin.getTrackerManager().getWhoTracks(owner)) {
+                if (viewer == null || ownerId.equals(viewer.getUniqueId())) continue;
+                plugin.getTaskScheduler().runTask(viewer, () -> {
+                    if (!owner.isOnline() || !viewer.isOnline()
+                            || plugin.getPlayerListener().getPlayer(ownerId) != owner
+                            || plugin.getPlayerListener().getPlayer(viewer.getUniqueId()) != viewer
+                            || plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                                != Settings.ThroughWallMode.VANILLA) return;
+                    reconcileVanillaVisibility(owner, viewer, owner.isSneaking());
+                });
+            }
+        }
+    }
+
+    private void reconcileVanillaVisibility(@NotNull Player owner, @NotNull Player viewer, boolean sneaking) {
+        final boolean allowed = isWithinVanillaVisibility(owner, viewer, sneaking);
+        for (PaperNametagRow row : getPacketDisplays(owner)) {
+            final PacketNameTag tag = (PacketNameTag) row;
+            if (tag.isRemoved()) continue;
+            if (!allowed && row.canPlayerSee(viewer)) {
+                // Privacy removal must not be cancelled by presentation visibility events.
+                tag.hideFromViewer(viewer.getUniqueId());
+            } else if (allowed && !row.canPlayerSee(viewer)
+                    && !tag.getBlocked().contains(viewer.getUniqueId())
+                    && tag.getPlatform().isEligibleToShow(owner.getUniqueId(), viewer.getUniqueId(), tag.isVisible(), false)) {
+                // Normal show path still checks preferences, tracking, vanish and event vetoes.
+                row.showToPlayer(viewer);
             }
         }
     }
@@ -1081,6 +1136,7 @@ public class NameTagManager implements UntNametagManagerPaper {
         }
         // OBSCURED owns this flag per viewer; placeholder refreshes must not reset it.
         if (throughWallMode != Settings.ThroughWallMode.OBSCURED
+                && throughWallMode != Settings.ThroughWallMode.VANILLA
                 && !(throughWallMode == Settings.ThroughWallMode.SEE_THROUGH
                     && plugin.getConfigManager().getSettings().getVisibility().isPreferNormalTextWithLineOfSight())
                 && (force || meta.isSeeThrough() != seeThrough)) {
@@ -1544,16 +1600,20 @@ public class NameTagManager implements UntNametagManagerPaper {
     }
 
     public void updateSneaking(@NotNull Player player, boolean sneaking) {
-        if (shiftSystemBlocked.getOrDefault(player.getUniqueId(), false)) {
+        if (shiftSystemBlocked.getOrDefault(player.getUniqueId(), false)
+                && plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                    != Settings.ThroughWallMode.VANILLA) {
             return;
         }
 
         final Settings settings = plugin.getConfigManager().getSettings();
         final Settings.ThroughWallMode mode = settings.getVisibility().getThroughWallMode();
-        final boolean isObscured = mode == Settings.ThroughWallMode.OBSCURED;
+        final boolean isObscured = mode == Settings.ThroughWallMode.OBSCURED || mode == Settings.ThroughWallMode.VANILLA;
         final byte sneakB = clampMcTextOpacity(settings.getVisibility().getSneakOpacity());
         final byte obscB = clampMcTextOpacity(settings.getVisibility().getThroughWallSettings().getOpacity());
-        final double maxSq = settings.getVisibility().getThroughWallSettings().getMaxDistance() * settings.getVisibility().getThroughWallSettings().getMaxDistance();
+        final double maxDistance = mode == Settings.ThroughWallMode.VANILLA
+                ? VanillaNametagVisibility.NORMAL_RANGE : settings.getVisibility().getThroughWallSettings().getMaxDistance();
+        final double maxSq = maxDistance * maxDistance;
 
         for (PaperNametagRow row : getPacketDisplays(player)) {
             final PacketNameTag packetNameTag = (PacketNameTag) row;
@@ -1581,7 +1641,8 @@ public class NameTagManager implements UntNametagManagerPaper {
             tag.clearObscuredPresentationTracking();
             if (tag.isTextDisplay()) {
                 applyTextVisualState(tag, tag.getDisplayGroup(), true);
-                if (throughWallMode != Settings.ThroughWallMode.OBSCURED) {
+                if (throughWallMode != Settings.ThroughWallMode.OBSCURED
+                        && throughWallMode != Settings.ThroughWallMode.VANILLA) {
                     tag.setTextOpacity(tag.isSneaking() ? sneakOpacity : (byte) -1);
                     applyNormalDepthPresentation(tag);
                 }

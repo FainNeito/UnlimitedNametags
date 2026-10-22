@@ -153,6 +153,10 @@ public final class BukkitNametagPlatform implements NametagPlatformBridge {
             return "own nametag is suppressed during swimming, prone or flight";
         }
         final var visibility = plugin.getConfigManager().getSettings().getVisibility();
+        if (!isOwnerViewer && !plugin.getNametagManager()
+                .isWithinVanillaVisibility(ownerPlayer, viewer, ownerPlayer.isSneaking())) {
+            return "vanilla distance or sneaking wall visibility suppresses nametags";
+        }
         if (!isOwnerViewer && visibility.getThroughWallMode()
                 == org.alexdev.unlimitednametags.config.Settings.ThroughWallMode.HIDE) {
             final double maxDistance = visibility.getThroughWallSettings().getMaxDistance();
