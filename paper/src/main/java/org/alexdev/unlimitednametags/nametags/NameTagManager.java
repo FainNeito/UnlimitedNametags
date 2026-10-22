@@ -56,6 +56,7 @@ public class NameTagManager implements UntNametagManagerPaper {
 
     private static final float COMPACT_ITEM_DISPLAY_HEIGHT_BLOCKS = 0.35f;
     private static final float COMPACT_BLOCK_DISPLAY_HEIGHT_BLOCKS = 0.5f;
+    private final Map<Integer, Set<UUID>> vanillaSuppressedViewers = new ConcurrentHashMap<>();
 
     private final UnlimitedNameTags plugin;
     private final ConcurrentHashMap<UUID, CopyOnWriteArrayList<PacketNameTag>> nameTags;
@@ -137,6 +138,7 @@ public class NameTagManager implements UntNametagManagerPaper {
     private void startTask() {
         tasks.forEach(MyScheduledTask::cancel);
         tasks.clear();
+        vanillaSuppressedViewers.clear();
 
         final MyScheduledTask displayAnimations = plugin.getTaskScheduler().runTaskTimerAsynchronously(
                 () -> {
@@ -376,6 +378,7 @@ public class NameTagManager implements UntNametagManagerPaper {
     }
 
     private void reconcileVanillaVisibility() {
+        vanillaSuppressedViewers.keySet().retainAll(entityIdToDisplay.keySet());
         for (UUID ownerId : nameTags.keySet()) {
             final Player owner = plugin.getPlayerListener().getPlayer(ownerId);
             if (owner == null) continue;
@@ -398,10 +401,15 @@ public class NameTagManager implements UntNametagManagerPaper {
         for (PaperNametagRow row : getPacketDisplays(owner)) {
             final PacketNameTag tag = (PacketNameTag) row;
             if (tag.isRemoved()) continue;
-            if (!allowed && row.canPlayerSee(viewer)) {
-                // Privacy removal must not be cancelled by presentation visibility events.
-                tag.hideFromViewer(viewer.getUniqueId());
-            } else if (allowed && !row.canPlayerSee(viewer)
+            final Set<UUID> suppressed = vanillaSuppressedViewers.computeIfAbsent(
+                    tag.getEntityId(), ignored -> ConcurrentHashMap.newKeySet());
+            if (!allowed) {
+                suppressed.add(viewer.getUniqueId());
+                if (row.canPlayerSee(viewer)) {
+                    // Privacy removal must not be cancelled by presentation visibility events.
+                    tag.hideFromViewer(viewer.getUniqueId());
+                }
+            } else if (suppressed.remove(viewer.getUniqueId()) && !row.canPlayerSee(viewer)
                     && !tag.getBlocked().contains(viewer.getUniqueId())
                     && tag.getPlatform().isEligibleToShow(owner.getUniqueId(), viewer.getUniqueId(), tag.isVisible(), false)) {
                 // Normal show path still checks preferences, tracking, vanish and event vetoes.
@@ -1523,6 +1531,7 @@ public class NameTagManager implements UntNametagManagerPaper {
 
     /** Release every viewer wrapper even when owner removal is requested while still online. */
     public void removeViewer(@NotNull UUID viewerId) {
+        vanillaSuppressedViewers.values().forEach(viewers -> viewers.remove(viewerId));
         nameTags.values().forEach(tags -> tags.forEach(display -> {
             display.hideFromViewer(viewerId);
             display.getBlocked().remove(viewerId);
