@@ -401,21 +401,26 @@ public class NameTagManager implements UntNametagManagerPaper {
 
     private void reconcileVanillaVisibility() {
         vanillaSuppressedViewers.keySet().retainAll(entityIdToDisplay.keySet());
+        final Map<Player, List<Player>> ownersByViewer = new HashMap<>();
         for (UUID ownerId : nameTags.keySet()) {
             final Player owner = plugin.getPlayerListener().getPlayer(ownerId);
             if (owner == null) continue;
             for (Player viewer : plugin.getTrackerManager().getWhoTracks(owner)) {
                 if (viewer == null || ownerId.equals(viewer.getUniqueId())) continue;
-                plugin.getTaskScheduler().runTask(viewer, () -> {
-                    if (!owner.isOnline() || !viewer.isOnline()
-                            || plugin.getPlayerListener().getPlayer(ownerId) != owner
-                            || plugin.getPlayerListener().getPlayer(viewer.getUniqueId()) != viewer
-                            || plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
-                                != Settings.ThroughWallMode.VANILLA) return;
-                    reconcileVanillaVisibility(owner, viewer, owner.isSneaking());
-                });
+                ownersByViewer.computeIfAbsent(viewer, ignored -> new ArrayList<>()).add(owner);
             }
         }
+        // Schedule once per viewer, rather than once per tracked owner/viewer pair.
+        ownersByViewer.forEach((viewer, owners) -> plugin.getTaskScheduler().runTask(viewer, () -> {
+            if (!viewer.isOnline() || plugin.getPlayerListener().getPlayer(viewer.getUniqueId()) != viewer
+                    || plugin.getConfigManager().getSettings().getVisibility().getThroughWallMode()
+                        != Settings.ThroughWallMode.VANILLA) return;
+            for (Player owner : owners) {
+                if (owner.isOnline() && plugin.getPlayerListener().getPlayer(owner.getUniqueId()) == owner) {
+                    reconcileVanillaVisibility(owner, viewer, owner.isSneaking());
+                }
+            }
+        }));
     }
 
     private void reconcileVanillaVisibility(@NotNull Player owner, @NotNull Player viewer, boolean sneaking) {
