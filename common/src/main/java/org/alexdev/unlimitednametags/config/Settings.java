@@ -214,7 +214,9 @@ public class Settings {
                 "Modes:",
                 " - SEE_THROUGH: Nametags are fully visible through walls (vanilla behavior).",
                 " - OBSCURED: Nametags are visible through walls but with reduced opacity (dimmed).",
-                " - HIDE: Nametags are completely hidden and despawned behind walls (anti-wallhack)."
+                " - HIDE: Nametags are completely hidden and despawned behind walls (anti-wallhack).",
+                " - VANILLA: 64 blocks normally; less than 32 while sneaking, hidden behind walls while sneaking.",
+                "VANILLA uses existing wall/sneak opacity and a fixed 64-block wall-check range."
         })
         private ThroughWallMode throughWallMode = ThroughWallMode.SEE_THROUGH;
 
@@ -248,7 +250,8 @@ public class Settings {
     public enum ThroughWallMode {
         SEE_THROUGH,
         OBSCURED,
-        HIDE
+        HIDE,
+        VANILLA
     }
 
     @Configuration

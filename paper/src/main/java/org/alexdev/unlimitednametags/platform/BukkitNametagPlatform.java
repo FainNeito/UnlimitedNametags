@@ -154,6 +154,12 @@ public final class BukkitNametagPlatform implements NametagPlatformBridge {
         }
         final var visibility = plugin.getConfigManager().getSettings().getVisibility();
         if (!isOwnerViewer && visibility.getThroughWallMode()
+                == org.alexdev.unlimitednametags.config.Settings.ThroughWallMode.VANILLA
+                && !plugin.getNametagManager()
+                .isWithinVanillaVisibility(ownerPlayer, viewer, ownerPlayer.isSneaking())) {
+            return "vanilla distance or sneaking wall visibility suppresses nametags";
+        }
+        if (!isOwnerViewer && visibility.getThroughWallMode()
                 == org.alexdev.unlimitednametags.config.Settings.ThroughWallMode.HIDE) {
             final double maxDistance = visibility.getThroughWallSettings().getMaxDistance();
             if (viewer.getLocation().distanceSquared(ownerPlayer.getLocation()) > maxDistance * maxDistance
