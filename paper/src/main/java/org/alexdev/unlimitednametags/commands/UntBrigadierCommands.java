@@ -23,6 +23,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -59,11 +60,14 @@ public final class UntBrigadierCommands {
                     .then(literalFormatter(plugin))
                     .then(literalHideOtherNametags(plugin))
                     .then(literalShowOtherNametags(plugin))
+                    .then(literalOwnNametag(plugin, "own"))
                     .then(literalPreferences(plugin))
                     .then(literalGlow(plugin))
                     .build();
 
             event.registrar().register(root, "UnlimitedNametags commands", List.of("unlimitednametags"));
+            event.registrar().register(literalOwnNametag(plugin, "nametag").build(),
+                    "Toggle viewing your own nametag", List.of());
         });
     }
 
@@ -82,6 +86,7 @@ public final class UntBrigadierCommands {
         msg(plugin, sender, "<green>/unt hideOtherNametags</green> <gray>- Hide other players' nametags</gray>");
         msg(plugin, sender, "<green>/unt showOtherNametags</green> <gray>- Show other players' nametags</gray>");
         msg(plugin, sender, "<green>/unt preferences …</green> <gray>- Per-player nametag visibility (see /unt preferences)");
+        msg(plugin, sender, "<green>/nametag [on|off]</green> <gray>- Toggle viewing your own nametag (also /unt own)</gray>");
         msg(plugin, sender, "<green>/unt glow …</green> <gray>- Per-player glow overrides (see /unt glow)");
     }
 
@@ -343,6 +348,38 @@ public final class UntBrigadierCommands {
                             }
                             return Command.SINGLE_SUCCESS;
                         }));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> literalOwnNametag(
+            @NotNull UnlimitedNameTags plugin, @NotNull String name) {
+        return Commands.literal(name)
+                .requires(stack -> stack.getSender().hasPermission("unt.preferences")
+                        && stack.getSender().hasPermission("unt.showownnametag"))
+                .executes(ctx -> execOwnNametag(plugin, ctx.getSource().getSender(), null))
+                .then(Commands.literal("on")
+                        .executes(ctx -> execOwnNametag(plugin, ctx.getSource().getSender(), true)))
+                .then(Commands.literal("off")
+                        .executes(ctx -> execOwnNametag(plugin, ctx.getSource().getSender(), false)));
+    }
+
+    private static int execOwnNametag(@NotNull UnlimitedNameTags plugin, @NotNull CommandSender sender,
+            @Nullable Boolean requested) {
+        if (!(sender instanceof Player player)) {
+            msg(plugin, sender, "<red>Players only.</red>");
+            return 0;
+        }
+        final var manager = plugin.getNametagManager();
+        final boolean show = requested != null ? requested : !manager.isShowingOwnNametagToSelf(player);
+        final var visibility = plugin.getConfigManager().getSettings().getVisibility();
+        if (show && !visibility.isShowCurrentNameTag()
+                && !visibility.isAllowPerPlayerShowOwnWhenGlobalDisabled()) {
+            msg(plugin, player, "<red>Viewing your own nametag is disabled on this server.</red>");
+            return 0;
+        }
+        manager.setShowingOwnNametagToSelf(player, show);
+        msg(plugin, player, show ? "<green>Your own nametag is enabled.</green>"
+                : "<green>Your own nametag is disabled.</green>");
+        return Command.SINGLE_SUCCESS;
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> literalPreferences(
