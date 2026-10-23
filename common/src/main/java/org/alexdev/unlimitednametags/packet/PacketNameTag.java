@@ -937,6 +937,11 @@ public abstract class PacketNameTag implements AnimationPoseTarget, NametagPasse
             resolveEntity(user);
             return;
         }
+        if (!viewerId.equals(ownerId)
+                && runtime.settings().getVisibility().getThroughWallMode() == Settings.ThroughWallMode.VANILLA
+                && !isEligibleToShow(viewerId)) {
+            return;
+        }
 
         final Location location = getOffsetPeLocation();
         if (location == null) {
